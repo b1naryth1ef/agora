@@ -1,25 +1,54 @@
 CREATE TABLE IF NOT EXISTS realms (
-  id BIGSERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY,
 
   -- Name of the realm
-  name TEXT,
+  name TEXT NOT NULL,
 
   -- The owner of this realm
-  owner_id BIGINT REFERENCES identities (id),
+  owner_id UUID REFERENCES identities (id) NOT NULL,
 
-  -- Whether this realm is publically listed
+  -- Default role of this realm
+  default_role_id UUID REFERENCES realm_roles (id),
+
+  -- Whether this realm is publicly listed
   is_public BOOLEAN
 );
 
 CREATE TABLE IF NOT EXISTS realm_members (
-  realm_id BIGINT REFERENCES realms (id),
-  identity_id BIGINT REFERENCES identities (id),
+  realm_id UUID REFERENCES realms (id) ON DELETE CASCADE,
+  identity_id UUID REFERENCES identities (id),
 
   -- When this member joined the realm
-  joined_at TIMESTAMP WITH TIME ZONE,
+  joined_at TIMESTAMP WITH TIME ZONE NOT NULL,
 
   -- Whether this member is a realm admin
   is_admin BOOLEAN,
 
   PRIMARY KEY (realm_id, identity_id)
 );
+
+CREATE TABLE IF NOT EXISTS realm_roles (
+  id UUID PRIMARY KEY,
+
+  -- Realm this role belongs too
+  realm_id UUID REFERENCES realms (id) ON DELETE CASCADE,
+
+  -- Name of this role
+  name TEXT NOT NULL,
+
+  -- Weight of this role (lower weight means higher priority)
+  weight SMALLINT NOT NULL,
+
+  -- Scopes this role grants to its members
+  granted_scopes JSONB
+);
+
+CREATE TABLE IF NOT EXISTS realm_member_roles (
+  role_id UUID REFERENCES realm_roles (id) ON DELETE CASCADE,
+  identity_id UUID REFERENCES identities (id),
+  realm_id UUID REFERENCES realms (id) ON DELETE CASCADE NOT NULL,
+
+  FOREIGN KEY (realm_id, identity_id) REFERENCES realm_members (realm_id, identity_id) ON DELETE CASCADE,
+
+  PRIMARY KEY (role_id, identity_id)
+)

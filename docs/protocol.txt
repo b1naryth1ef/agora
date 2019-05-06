@@ -1,0 +1,8 @@
+Instance:
+  An instance is a single installation of agora.
+
+Realm:
+  A realm is a set of members and channels hosted on an instance.
+
+Identity:
+  An identity is a single user (one user can have many identities however). Its identified by a base64 encoded Ed25519 public key.

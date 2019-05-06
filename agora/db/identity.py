@@ -1,5 +1,6 @@
 from quart import g
 from nacl.utils import random
+import ulid.api
 
 
 async def create_or_update_identity(key, alias=None):
@@ -7,12 +8,13 @@ async def create_or_update_identity(key, alias=None):
 
     row = await g.conn.fetchrow(
         """
-        INSERT INTO identities (key, access_token, alias)
-        VALUES ($1, $2, $3)
+        INSERT INTO identities (id, key, access_token, alias)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT (key) DO UPDATE SET
             alias=EXCLUDED.alias
         RETURNING *
     """,
+        ulid.api.new().uuid,
         key,
         access_token,
         alias,

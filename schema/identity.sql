@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS identities (
-  id BIGSERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY,
 
   -- Public signing key for this identity
   key TEXT,

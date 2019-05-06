@@ -1,8 +1,9 @@
 import time
 
 from quart import Blueprint, request, jsonify
-from chat.db.identity import create_or_update_identity
-from chat.http.util import APIError, validate_json
+from agora.db.identity import create_or_update_identity
+from agora.http.util import APIError, validate_json
+from agora.config import config
 
 from nacl.exceptions import BadSignatureError
 from nacl.encoding import Base64Encoder

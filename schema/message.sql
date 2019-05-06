@@ -11,14 +11,11 @@ DO $$
 $$;
 
 
-CREATE TABLE IF NOT EXISTS messages (
-  id BIGSERIAL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS realm_messages (
+  id UUID PRIMARY KEY,
 
-  type message_type,
-  channel_id BIGINT REFERENCES channels (id) NOT NULL,
-  author_id BIGINT REFERENCES identities (id) NOT NULL,
-  content JSONB NOT NULL,
-
-  -- Realm (if applicable)
-  realm_id BIGINT REFERENCES realms (id)
-)
+  type message_type NOT NULL,
+  realm_channel_id UUID REFERENCES realm_channels (id) ON DELETE CASCADE NOT NULL,
+  author_id UUID REFERENCES identities (id) NOT NULL,
+  content JSONB NOT NULL
+);

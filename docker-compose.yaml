@@ -1,0 +1,33 @@
+version: '3.7'
+
+services:
+  db:
+    image: postgres:11.2
+    environment:
+      POSTGRES_USER: agora
+      POSTGRES_PASSWORD: agora
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agora"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - agora-db:/var/lib/postgresql/data
+  redis:
+    image: redis:5.0
+  web:
+    build: .
+    command: ./manage.py serve -r
+    environment:
+      AGORA_PG_URL: postgres://agora:agora@db/agora
+      AGORA_REDIS_URL: redis://redis/0
+    volumes:
+      - .:/opt/agora
+    ports:
+      - "32000:32000"
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  agora-db:

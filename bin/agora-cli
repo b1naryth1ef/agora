@@ -1,0 +1,266 @@
+#!/usr/bin/env python3.7
+
+import os
+import sys
+import json
+import requests
+import asyncio
+import websockets
+import click
+from nacl.encoding import Base64Encoder
+from nacl.signing import SigningKey
+
+config = None
+
+
+def _read_config(path):
+    with open(path, "r") as f:
+        return json.load(f)
+
+
+def _write_config(path, value):
+    with open(path, "w") as f:
+        json.dump(value, f)
+
+
+@click.group()
+@click.option("--config-path", default="~/.config/agora.json")
+@click.option("--realm-id", default=None)
+@click.option("--channel-id", default=None)
+@click.pass_context
+def cli(ctx, config_path, realm_id, channel_id):
+    global config
+
+    config_path = os.path.expanduser(config_path)
+
+    if os.path.exists(config_path):
+        config = _read_config(config_path)
+        identity = next(
+            (
+                i
+                for i in config["identities"]
+                if i["id"] == config["defaults"]["identity"]
+            ),
+            None,
+        )
+        assert identity
+        ctx.obj["identity"] = SigningKey(identity["key"], encoder=Base64Encoder)
+        ctx.obj["instance"] = next(
+            (
+                i
+                for i in config["instances"]
+                if i["url"] == config["defaults"]["instance"]
+            ),
+            None,
+        )
+        if ctx.obj["instance"]:
+            ctx.obj["session"] = requests.Session()
+            ctx.obj["session"].headers["Authentication"] = "Token {}".format(
+                ctx.obj["instance"]["access_token"]
+            )
+            ctx.obj["url"] = ctx.obj["instance"]["url"]
+
+        ctx.obj["realm_id"] = realm_id
+        ctx.obj["channel_id"] = channel_id
+
+    if not config and ctx.invoked_subcommand != "init":
+        print("ERROR: agora-cli has not been initialized, please run `agora-cli init`")
+        sys.exit(1)
+
+    ctx.obj["config_path"] = config_path
+
+
+@cli.command("init")
+@click.pass_context
+def command_init(ctx):
+    global config
+    assert config is None
+
+    identity_key = SigningKey.generate()
+    config = {"defaults": {}, "identities": [], "instances": []}
+
+    config["identities"].append(
+        {
+            "id": identity_key.verify_key.encode(encoder=Base64Encoder).decode("utf-8"),
+            "key": identity_key.encode(encoder=Base64Encoder).decode("utf-8"),
+        }
+    )
+
+    config["defaults"] = {"identity": config["identities"][0]["id"]}
+
+    _write_config(ctx.obj["config_path"], config)
+    print("Initialized Config")
+
+
+@cli.command("dump-key")
+@click.pass_context
+def command_dump_key(ctx):
+    print(
+        '"{}"'.format(
+            ctx.obj["identity"].verify_key.encode(encoder=Base64Encoder).decode("utf-8")
+        )
+    )
+
+
+@cli.group()
+def instances():
+    pass
+
+
+@instances.command("join")
+@click.argument("instance-address")
+@click.pass_context
+def command_instances_join(ctx, instance_address):
+    global config
+
+    existing_instance = next(
+        (i for i in config["instances"] if i["url"] == instance_address), None
+    )
+    if existing_instance:
+        print("Error: that instance is already registered locally")
+        return
+
+    r = requests.get(instance_address + "/instance/info")
+    r.raise_for_status()
+
+    key_id = (
+        ctx.obj["identity"].verify_key.encode(encoder=Base64Encoder).decode("utf-8")
+    )
+    r = requests.get(instance_address + "/auth/challenge", params={"key": key_id})
+    r.raise_for_status()
+
+    body = json.dumps(
+        {"key": key_id, "challenge": r.json()["challenge"], "identity": {}}
+    )
+
+    signature = Base64Encoder.encode(
+        ctx.obj["identity"].sign(body.encode("utf-8")).signature
+    ).decode("utf-8")
+    r = requests.post(
+        instance_address + "/auth/join",
+        headers={
+            "Content-Type": "application/json",
+            "X-Challenge-Signature": signature,
+        },
+        data=body,
+    )
+    r.raise_for_status()
+
+    config["instances"].append(
+        {"url": instance_address, "access_token": r.json()["access_token"]}
+    )
+
+    if len(config["instances"]) == 1:
+        config["defaults"]["instance"] = instance_address
+
+    _write_config(ctx.obj["config_path"], config)
+
+
+@cli.group()
+def realms():
+    pass
+
+
+@realms.command("create")
+@click.argument("name")
+@click.option("--public/--no-public", default=True)
+@click.pass_context
+def command_realms_create(ctx, name, public):
+    global config
+
+    assert ctx.obj["session"]
+    r = ctx.obj["session"].post(
+        ctx.obj["url"] + "/realms", json={"name": name, "public": public}
+    )
+    r.raise_for_status()
+
+    print("Ok created realm with ID {}".format(r.json()["id"]))
+
+
+@realms.command("stream")
+@click.pass_context
+def command_realms_stream(ctx):
+    assert ctx.obj["realm_id"], "Realm ID Required"
+
+    async def _stream_coro():
+        wsurl = ctx.obj["url"].replace("https", "wss").replace("http", "ws")
+        conn = websockets.connect(
+            wsurl + "/stream/ws",
+            extra_headers={
+                "Authentication": "Token {}".format(ctx.obj["instance"]["access_token"])
+            },
+        )
+
+        async with conn as websocket:
+            while True:
+                print(await websocket.recv())
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_stream_coro())
+
+
+@realms.command("join")
+@click.argument("realm_id")
+@click.pass_context
+def command_realms_join(ctx, realm_id):
+    assert ctx.obj["session"]
+
+    r = ctx.obj["session"].post(ctx.obj["url"] + f"/realms/{realm_id}/join",)
+    r.raise_for_status()
+
+    print("Ok, joined that realm")
+
+
+@cli.group()
+def channels():
+    pass
+
+
+@channels.command("create")
+@click.argument("name")
+@click.option("--type", default="text")
+@click.option("--topic", default="")
+@click.pass_context
+def command_channels_create(ctx, name, type, topic):
+    assert ctx.obj["realm_id"], "Realm ID Required"
+    assert ctx.obj["session"]
+
+    realm_id = ctx.obj["realm_id"]
+    r = ctx.obj["session"].post(
+        ctx.obj["url"] + f"/realms/{realm_id}/channels",
+        json={"name": name, "type": type, "topic": topic},
+    )
+    r.raise_for_status()
+
+    print("Ok created channel with ID {}".format(r.json()["id"]))
+
+
+@cli.group()
+def messages():
+    pass
+
+
+@messages.command("create")
+@click.argument("content")
+@click.option("--type", default="prose")
+@click.pass_context
+def command_messages_create(ctx, content, type):
+    assert ctx.obj["realm_id"], "Realm ID Required"
+    assert ctx.obj["channel_id"], "Channel ID Required"
+    assert ctx.obj["session"]
+
+    realm_id = ctx.obj["realm_id"]
+    channel_id = ctx.obj["channel_id"]
+
+    r = ctx.obj["session"].post(
+        ctx.obj["url"] + f"/realms/{realm_id}/channels/{channel_id}/messages",
+        json={"type": type, "content": {"body": content}},
+    )
+    print(r.content)
+    r.raise_for_status()
+
+    print("Ok created message with ID {}".format(r.json()["id"]))
+
+
+if __name__ == "__main__":
+    cli(obj={})

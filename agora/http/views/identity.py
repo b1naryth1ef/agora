@@ -1,7 +1,7 @@
 from quart import Blueprint, jsonify, g
 
-from chat.db.identity import serialize_identity
-from chat.http.util import authed
+from agora.db.identity import serialize_identity
+from agora.http.util import authed
 
 blueprint = Blueprint("identity", __name__)
 

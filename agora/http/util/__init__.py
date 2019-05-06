@@ -1,7 +1,9 @@
 from functools import wraps
 from quart import request, g
 from nacl.encoding import Base64Encoder
-from chat.db.identity import get_identity_by_access_token
+from agora.db.identity import get_identity_by_access_token
+from agora.db.realm import get_realm_session_info
+from agora.config import config
 
 
 class APIError(Exception):
@@ -40,12 +42,16 @@ async def validate_json(schema):
     return result
 
 
-def authed():
+def authed(acl=None, require_owner=False):
     def deco(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             if not g.identity:
                 raise APIError(0, "Authentication Required", status_code=403)
+
+            if require_owner and not g.owner:
+                raise APIError(0, "Forbidden", status_code=401)
+
             return f(*args, **kwargs)
 
         return wrapper
@@ -65,3 +71,10 @@ async def authenticate_request(entity):
 
         if not g.identity:
             raise APIError(0, "Invalid Authentication")
+
+        if "realm_id" in request.view_args:
+            g.session = await get_realm_session_info(
+                g.identity, request.view_args.pop("realm_id")
+            )
+
+        g.owner = g.identity["key"] in config["instance"]["owners"]

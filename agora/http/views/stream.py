@@ -1,12 +1,12 @@
 import asyncio
-import json
 
 from aioredis.pubsub import Receiver
 from quart import Blueprint, websocket, g
-from chat.redis import get_pool
-from chat.db import release
-from chat.db.identity import serialize_identity
-from chat.db.realm import get_realms_for_hello, serialize_realm
+from agora.redis import get_pool
+from agora.db import release
+from agora.db.identity import serialize_identity
+from agora.db.realm import get_realms_for_hello, serialize_realm
+from agora.util.json import dumps
 from ..util import authed
 
 
@@ -27,7 +27,7 @@ async def stream_ws():
     await release(g.conn)
 
     await websocket.send(
-        json.dumps(
+        dumps(
             {
                 "e": "HELLO",
                 "d": {
@@ -44,6 +44,9 @@ async def stream_ws():
     # Subscribe to realm channels
     for realm in realms:
         await pool.execute_pubsub("subscribe", recv.channel(f'r:{realm["id"]}'))
+
+        for channel in realm["channels"]:
+            await pool.execute_pubsub("subscribe", recv.channel(f'c:{channel["id"]}'))
 
     ws_message_coro = asyncio.create_task(websocket.receive())
     redis_message_coro = asyncio.create_task(recv.get())
