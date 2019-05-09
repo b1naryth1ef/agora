@@ -7,9 +7,6 @@ CREATE TABLE IF NOT EXISTS realms (
   -- The owner of this realm
   owner_id UUID REFERENCES identities (id) NOT NULL,
 
-  -- Default role of this realm
-  default_role_id UUID REFERENCES realm_roles (id),
-
   -- Whether this realm is publicly listed
   is_public BOOLEAN
 );
@@ -42,6 +39,9 @@ CREATE TABLE IF NOT EXISTS realm_roles (
   -- Scopes this role grants to its members
   granted_scopes JSONB
 );
+
+-- TODO: figure out a better way to do this?
+ALTER TABLE realms ADD COLUMN IF NOT EXISTS default_role_id UUID REFERENCES realm_roles (id);
 
 CREATE TABLE IF NOT EXISTS realm_member_roles (
   role_id UUID REFERENCES realm_roles (id) ON DELETE CASCADE,

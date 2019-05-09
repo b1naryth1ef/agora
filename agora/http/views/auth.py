@@ -3,7 +3,6 @@ import time
 from quart import Blueprint, request, jsonify
 from agora.db.identity import create_or_update_identity
 from agora.http.util import APIError, validate_json
-from agora.config import config
 
 from nacl.exceptions import BadSignatureError
 from nacl.encoding import Base64Encoder
@@ -22,9 +21,7 @@ async def auth_challenge():
         raise APIError(0, "key required")
 
     timestamp = int(time.time())
-
     challenge_data = "{}:{}".format(timestamp, values["key"])
-
     challenge = challenge_key.sign(challenge_data.encode("utf-8"))
 
     return jsonify(

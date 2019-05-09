@@ -9,6 +9,11 @@ async def init_redis(url):
     pool = await aioredis.create_pool(url)
 
 
+def close_redis():
+    pool.close()
+    return pool.wait_closed()
+
+
 def acquire():
     return pool.acquire()
 
