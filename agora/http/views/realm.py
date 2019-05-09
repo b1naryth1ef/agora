@@ -30,7 +30,9 @@ def require_realm(pass_realm=False, pass_member=False):
                 kwargs["member"] = g.session["member"]
 
             return await f(*args, **kwargs)
+
         return wrap
+
     return deco
 
 

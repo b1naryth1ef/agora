@@ -45,12 +45,10 @@ async def delete_realm_message_by_id(message_id, ensure_author_id=None):
         DELETE FROM realm_messages
         WHERE id=$1 {}
         RETURNING *
-    """.format("AND author_id=$2" if ensure_author_id else "")
-    return await g.conn.fetchrow(
-        query,
-        message_id,
-        ensure_author_id,
+    """.format(
+        "AND author_id=$2" if ensure_author_id else ""
     )
+    return await g.conn.fetchrow(query, message_id, ensure_author_id)
 
 
 def serialize_message(message):

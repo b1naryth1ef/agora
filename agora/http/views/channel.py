@@ -25,14 +25,18 @@ def require_channel(pass_channel=False):
             if not g.session:
                 raise APIError(0, "unknown realm", status_code=404)
 
-            channel = await get_realm_channel(g.session["realm"]["id"], kwargs.pop("channel_id"))
+            channel = await get_realm_channel(
+                g.session["realm"]["id"], kwargs.pop("channel_id")
+            )
             if not channel:
                 raise APIError(0, "unknown channel", status_code=404)
 
             if pass_channel:
                 kwargs["channel"] = channel
             return await f(*args, **kwargs)
+
         return wrap
+
     return deco
 
 

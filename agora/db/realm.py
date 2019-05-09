@@ -156,7 +156,8 @@ async def create_realm_membership(realm, identity_id):
             VALUES ($1, $2, current_timestamp)
             RETURNING *
         """,
-            realm["id"], identity_id,
+            realm["id"],
+            identity_id,
         )
 
         await g.conn.execute(

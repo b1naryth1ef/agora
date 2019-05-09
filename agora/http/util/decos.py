@@ -11,12 +11,16 @@ def require_scopes(*scopes, allow_any=False, include_scopes=False):
             rules = get_scope_rules_for_request()
             contains = {scope: scopes_contains(rules, scope) for scope in scopes}
 
-            if (allow_any and True not in contains.values()) or not all(contains.values()):
+            if (allow_any and True not in contains.values()) or not all(
+                contains.values()
+            ):
                 raise APIError(0, "invalid scopes", 401)
 
             if include_scopes:
                 kwargs["scopes"] = contains
 
             return fn(*args, **kwargs)
+
         return wrapper
+
     return deco
