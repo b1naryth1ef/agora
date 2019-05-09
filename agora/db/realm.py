@@ -108,27 +108,19 @@ async def delete_realm(realm_id):
 async def get_realm_session_info(identity, realm_id):
     return await g.conn.fetchrow(
         """
-        WITH member AS (
-          SELECT DISTINCT ON (rm.realm_id) rm.*
-          FROM realm_members rm
-          WHERE rm.realm_id = $2 AND rm.identity_id = $1
-        ),
-        roles AS (
-          SELECT DISTINCT ON (rr.realm_id) array_agg(rr.*) AS member_roles
-          FROM realm_roles rr
-          JOIN realm_member_roles rmr ON rmr.role_id = rr.id
-          WHERE rmr.realm_id = $2 AND rmr.identity_id = $1
-          GROUP BY rr.realm_id
-        )
         SELECT
-          r as realm,
-          m::realm_members as member,
-          rs.member_roles as member_roles
-        FROM
-          realms r,
-          member m,
-          roles rs
-        WHERE r.id = $2;
+            row(r.*)::realms as realm,
+            row(rm.*)::realm_members as member,
+            array_agg(rr.*) as roles
+        FROM realms r
+        LEFT JOIN realm_members rm ON rm.realm_id = r.id
+        LEFT OUTER JOIN realm_member_roles rmr ON rmr.realm_id = r.id
+        LEFT JOIN realm_roles rr ON rr.id = rmr.role_id
+        WHERE
+          r.id = $2
+          AND rm.identity_id = $1
+          AND rmr.identity_id = $1
+        GROUP BY r.id, rm.realm_id, rm.identity_id
     """,
         identity["id"],
         realm_id,

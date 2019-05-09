@@ -34,7 +34,7 @@ def get_scope_rules_for_request():
         return ["realm.*"]
 
     scopes = set()
-    for role in g.session["member_roles"]:
+    for role in g.session["roles"]:
         # TODO: lol
         granted_scopes = json.loads(role["granted_scopes"])
         scopes |= set(granted_scopes.keys())
