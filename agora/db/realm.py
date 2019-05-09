@@ -1,3 +1,5 @@
+import json
+
 from quart import g
 import ulid.api
 
@@ -136,10 +138,14 @@ async def get_realm_session_info(identity, realm_id):
 async def get_realms_for_hello(identity):
     return await g.conn.fetch(
         """
-        SELECT r.*, array_agg(c.*) as channels
+        SELECT
+            r.*,
+            array_remove(array_agg(c.*), NULL) as channels,
+            array_remove(array_agg(rs.*), NULL) as roles
         FROM realms r
-        JOIN realm_channels c ON (c.realm_id = r.id)
         JOIN realm_members rm ON (rm.realm_id = r.id)
+        LEFT JOIN realm_channels c ON (c.realm_id = r.id)
+        LEFT JOIN realm_roles rs ON (rs.realm_id = r.id)
         WHERE rm.identity_id=$1
         GROUP BY r.id
     """,
@@ -181,8 +187,20 @@ def serialize_realm(realm):
     if "channels" in realm:
         data["channels"] = [serialize_realm_channel(c) for c in realm["channels"]]
 
+    if "roles" in realm:
+        data["roles"] = [serialize_realm_role(r) for r in realm["roles"]]
+
     return data
 
 
 def serialize_realm_member(member):
     return {"joined_at": member["joined_at"], "admin": member["is_admin"]}
+
+
+def serialize_realm_role(role):
+    return {
+        "id": role["id"],
+        "name": role["name"],
+        "weight": role["weight"],
+        "granted_scopes": json.loads(role["granted_scopes"]),
+    }

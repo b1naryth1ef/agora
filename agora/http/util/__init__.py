@@ -72,9 +72,9 @@ async def authenticate_request(entity):
         if not g.identity:
             raise APIError(0, "Invalid Authentication")
 
-        if "realm_id" in request.view_args:
+        if "realm_id" in entity.view_args:
             g.session = await get_realm_session_info(
-                g.identity, request.view_args.pop("realm_id")
+                g.identity, entity.view_args.pop("realm_id")
             )
 
         g.owner = g.identity["key"] in config["instance"]["owners"]
