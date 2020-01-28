@@ -140,7 +140,7 @@ def command_instances_join(ctx, instance_address):
         instance_address + "/auth/join",
         headers={
             "Content-Type": "application/json",
-            "X-Challenge-Signature": signature,
+            "X-Challenge-Proof": signature,
         },
         data=body,
     )

@@ -1,9 +1,8 @@
 from functools import wraps
 from quart import request, g
-from nacl.encoding import Base64Encoder
-from agora.db.identity import get_identity_by_access_token
 from agora.db.realm import get_realm_session_info
 from agora.config import config
+from agora.http.util.auth import authenticate_from_token, AuthenticationFailure
 
 
 class APIError(Exception):
@@ -61,20 +60,14 @@ def authed(acl=None, require_owner=False):
 
 async def authenticate_request(entity):
     if "Authentication" in entity.headers:
-        if " " not in entity.headers["Authentication"]:
-            raise APIError(0, "Invalid Authentication Header Format")
-
-        method, data = entity.headers["Authentication"].split(" ", 1)
-        if method == "Token":
-            access_token = Base64Encoder.decode(data)
-            g.identity = await get_identity_by_access_token(access_token)
-
-        if not g.identity:
+        try:
+            g.identity = await authenticate_from_token(entity.headers["Authentication"])
+        except AuthenticationFailure:
             raise APIError(0, "Invalid Authentication")
 
         if "realm_id" in entity.view_args:
             g.session = await get_realm_session_info(
-                g.identity, entity.view_args.pop("realm_id")
+                g.identity, entity.view_args["realm_id"]
             )
 
         g.owner = g.identity["key"] in config["instance"]["owners"]

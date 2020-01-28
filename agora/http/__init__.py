@@ -1,9 +1,10 @@
 import os
 
 from quart import Quart, jsonify, g, request, websocket
+from quart_cors import cors
 
-from agora.redis import init_redis
-from agora.db import init_db, acquire, release
+from agora.redis import init_redis, close_redis
+from agora.db import init_db, close_db, acquire, release
 from agora.util.json import JSONEncoder
 from .util import APIError, authenticate_request
 from .util.converter import ULIDConverter
@@ -16,6 +17,7 @@ from .views.realm import blueprint as realm_blueprint
 from .views.stream import blueprint as stream_blueprint
 
 app = Quart(__name__)
+app = cors(app, allow_origin=["*"])
 app.json_encoder = JSONEncoder
 app.url_map.converters["ulid"] = ULIDConverter
 
@@ -59,6 +61,12 @@ async def before_websocket():
 async def after_request(res):
     await release(g.conn)
     return res
+
+
+@app.after_serving
+async def after_serving():
+    await close_db()
+    await close_redis()
 
 
 @app.errorhandler(APIError)

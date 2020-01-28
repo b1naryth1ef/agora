@@ -36,19 +36,18 @@ async def auth_challenge():
 
 @blueprint.route("/auth/join", methods=["POST"])
 async def auth_join():
-    signature = request.headers.get("X-Challenge-Signature")
-    if not signature:
-        raise APIError(0, "Signature Required")
-
-    signature = Base64Encoder.decode(signature)
+    proof = request.headers.get("X-Challenge-Proof")
+    if not proof:
+        raise APIError(0, "Proof Signature Required")
+    proof_signature = Base64Encoder.decode(proof)
 
     raw_data = await request.data
     data = await validate_json({"key": str, "challenge": dict, "identity": dict})
 
-    # First validate the users signature
+    # First validate the users proof
     try:
         key = VerifyKey(data["key"], encoder=Base64Encoder)
-        key.verify(raw_data, signature)
+        key.verify(raw_data, proof_signature)
     except BadSignatureError:
         raise APIError(0, "Invalid Signature")
 

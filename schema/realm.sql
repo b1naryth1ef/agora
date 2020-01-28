@@ -53,5 +53,5 @@ CREATE TABLE IF NOT EXISTS realm_member_roles (
   PRIMARY KEY (role_id, identity_id)
 );
 
-CREATE INDEX realm_member_roles_realm_id_idx
+CREATE INDEX IF NOT EXISTS realm_member_roles_realm_id_idx
   ON realm_member_roles (realm_id);

@@ -82,4 +82,5 @@ async def realm_channel_message_delete(channel, scopes, message_id):
     if not message:
         raise APIError(0, "unknown message", status_code=404)
 
+    await dispatch_event("MESSAGE_DELETE", message, channel=channel)
     return "", 204

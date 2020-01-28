@@ -23,8 +23,15 @@ async def count_realms_by_user(identity):
 async def get_realm(realm_id):
     return await g.conn.fetchrow(
         """
-        SELECT * FROM realms
-        WHERE id=$1
+        SELECT
+            r.*,
+            array_remove(array_agg(c.*), NULL) as channels,
+            array_remove(array_agg(rs.*), NULL) as roles
+        FROM realms r
+        LEFT JOIN realm_channels c ON (c.realm_id = r.id)
+        LEFT JOIN realm_roles rs ON (rs.realm_id = r.id)
+        WHERE r.id=$1
+        GROUP BY r.id
     """,
         realm_id,
     )

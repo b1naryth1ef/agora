@@ -1,4 +1,4 @@
-from quart import Blueprint, jsonify, g
+from quart import Blueprint, jsonify, g, request
 from functools import wraps
 
 from agora.config import config
@@ -24,6 +24,7 @@ def require_realm(pass_realm=False, pass_member=False):
                 raise APIError(0, "unknown realm", status_code=404)
 
             if pass_realm:
+                kwargs.pop("realm_id")
                 kwargs["realm"] = g.session["realm"]
 
             if pass_member:

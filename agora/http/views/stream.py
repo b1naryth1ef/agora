@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from aioredis.pubsub import Receiver
 from quart import Blueprint, websocket, g
@@ -6,17 +7,53 @@ from agora.redis import get_pool
 from agora.db import release
 from agora.db.identity import serialize_identity
 from agora.db.realm import get_realms_for_hello, serialize_realm
+from agora.http.util.auth import authenticate_from_token, AuthenticationFailure
 from agora.util.json import dumps
-from ..util import authed
 
 
 blueprint = Blueprint("stream", __name__)
 
 
 @blueprint.websocket("/stream/ws")
-@authed()
 async def stream_ws():
     await websocket.accept()
+
+    try:
+        login = await websocket.receive()
+        payload = json.loads(login)
+        method = payload['a']
+        data = payload['d']
+    except Exception:
+        websocket.send(dumps({
+            "e": "ERROR",
+            "d": {
+                "code": 0,
+                "message": "Invalid Payload",
+            },
+        }))
+        return
+
+    if method != 'LOGIN':
+        websocket.send(dumps({
+            "e": "ERROR",
+            "d": {
+                "code": 0,
+                "message": "Login Required",
+            },
+        }))
+        return
+
+    try:
+        g.identity = await authenticate_from_token(data)
+    except AuthenticationFailure:
+        websocket.send(dumps({
+            "e": "ERROR",
+            "d": {
+                "code": 0,
+                "message": "Invalid Authentication",
+            }
+        }))
+        return
 
     pool = get_pool()
     recv = Receiver()
@@ -39,7 +76,7 @@ async def stream_ws():
     )
 
     # Subscribe to the user channel
-    await pool.execute_pubsub("subscribe", recv.channel(f'u:{g.identity["key"]}'))
+    await pool.execute_pubsub("subscribe", recv.channel(f'u:{g.identity["id"]}'))
 
     # Subscribe to realm channels
     for realm in realms:
