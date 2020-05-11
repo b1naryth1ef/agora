@@ -1,8 +1,121 @@
-Instance:
-  An instance is a single installation of agora.
+The agora protocol is fundamentally structured around the encryption primitives that the [NaCL](https://nacl.cr.yp.to/) library (and its spiritual successor [libsodium](https://github.com/jedisct1/libsodium)) implement.
 
-Realm:
-  A realm is a set of members and channels hosted on an instance.
+Clients in agora are identified by a libsodium signing keypair. Once a keypair is generated it can be used to join and authenticate with instances. Instances in agora represent self-hosted servers that can be joined and connected too by clients. Each instance generally requires its own connection, although the protocol supports aggregation and secure proxying of instance connections.
 
-Identity:
-  An identity is a single user (one user can have many identities however). Its identified by a base64 encoded Ed25519 public key.
+## Join Instance
+
+GET /instance/info
+  res: {
+    name: "..."
+  }
+
+  Used to retrieve information about the instance. You do not need to call this before proceeding.
+
+
+GET /auth/challenge?key=<b64encoded public key>
+  res: {
+    challenge: {
+      value: "...",
+      timestamp: 123456,
+    }
+  }
+
+  Used to retrieve an authentication challenge which is used by the server to verify the identity of the client.
+
+
+POST /auth/join
+  headers: {
+    X-Challenge-Proof: "<b64encoded signature of request body>"
+  }
+
+  body: {
+    key: "<b64 encoded public key>",
+    challenge: {
+      value: "...",
+      timestamp: 123456,
+    },
+    identity: {}
+  }
+
+  res: {
+    "access_token": "access token"
+  }
+
+  Used to actually perform the join operation against the instance. The challenge signature must be the identities signature of HTTP request body sent by the client. The response access token can now be used in subsequent requests as the authentication header.
+
+
+## Using Access Token
+
+The access token is passed in the HTTP Authentication header:
+  headers: {
+    Authentication: "Token <access_token>"
+  }
+
+
+## Streaming Events
+
+Connect with a websocket to /stream/ws (with a valid authentication header). Messages are json encoded and found in the following structure:
+
+  {
+    "e": "<event identifier>",
+    "d": {<event data>},
+  }
+
+No data is expected to be sent from the client currently.
+
+## Creating a realm
+
+POST /realms
+  body: {
+    name: "lads",
+    public: false,
+  }
+
+  res: {
+    id: "ulid",
+    name: "lads",
+    public: false,
+    channels: [],
+    roles: []
+  }
+
+  Creates a new realm.
+
+## Deleting a realm
+
+DELETE /realms/<id>
+
+## Creating a channel
+
+POST /realms/<id>/channels
+  body: {
+    type: "text",
+    name: "talk",
+    topic: "yo dawg heard u like to talk"
+  }
+
+  res: {
+    id: "ulid",
+    type: "text",
+    name: "talk",
+    topic: "yo dawg heard u like to talk"
+  }
+
+## Deleting a channel
+
+DELETE /realms/<id>/channels/<id>
+
+## Creating a message
+
+POST /realms/<id>/channels/<id>/messages
+  body: {
+    type: "prose",
+    content: "yeet gang 420",
+  }
+
+  res: {
+    id: "ulid",
+    type: "prose",
+    author_id: "ulid",
+    content: "json",
+  }
