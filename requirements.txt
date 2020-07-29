@@ -47,7 +47,7 @@ toml==0.10.0
 typing-extensions==3.7.2
 ulid-py==0.0.9
 urllib3==1.24.3
-uvicorn==0.8.1
+uvicorn==0.11.7
 uvloop==0.12.2
 websockets==7.0
 wsproto==0.14.0
